@@ -14,6 +14,18 @@ recipes.addShaped("Cheaper Chassis Parts",
 [constructionAlloyOrIron, casing, constructionAlloyOrIron], 
 [constructionAlloyOrIron, constructionAlloyOrIron, constructionAlloyOrIron]]);
 
+# This is basically quantity filter with auto input/output
+# [Impulse Hopper] from [Basic Machine Casing][+4]
+craft.remake(<enderio:block_impulse_hopper>, ["pretty",
+  "▬ ◘ ▬",
+  "I □ I",
+  "▬ ♥ ▬"], {
+  "□": <ore:machineBlock>,     # Basic Machine Casing
+  "♥": <ore:blockRedstone>,    # Block of Redstone
+  "◘": <ore:blockHopper>,      # Hopper
+  "I": <ore:gearIronInfinity>, # Infinity Bimetal Gear
+  "▬": <ore:ingotDarkSteel>    # Dark Steel Ingot
+});
 
 # Electrical Steel
 mods.thermalexpansion.InductionSmelter.removeRecipe(<thermalfoundation:material:96>, <nuclearcraft:gem:6>);
