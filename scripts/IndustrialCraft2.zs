@@ -204,3 +204,17 @@ for ore_entry in oreDict {
 # Milk Powder <-> Milk conversions
 scripts.process.evaporate(<fluid:milk> * 250, <ic2:dust:33>, "No exceptions");
 scripts.process.solution([<ic2:dust:33>], [<fluid:water> * 250], [<fluid:milk> * 250], null, "Except: highoven");
+
+# This recipe was corrupted. Error:
+#   Could not dump recipe for <ic2:te:2>
+#   java.lang.IndexOutOfBoundsException: Index: 0, Size: 0
+# Somehow it have "null" instead of each ingredient
+# [Nuke] from [Advanced Machine Casing][+2]
+craft.remake(<ic2:te:2>, ["pretty",
+  "I A I",
+  "I ■ I",
+  "I A I"], {
+  "■": <ore:machineBlockAdvanced>, # Advanced Machine Casing
+  "A": <ore:circuitAdvanced>,      # Advanced Circuit
+  "I": <ic2:iridium_reflector>,    # Iridium Neutron Reflector
+});
