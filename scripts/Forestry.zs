@@ -188,12 +188,16 @@ for name in bagNames {
 	], 40, <liquid:water> * 250);
 }
 
-//mods.forestry.Still.addRecipe(ILiquidStack fluidOutput, ILiquidStack fluidInput, int timePerUnit);
-#mods.forestry.Still.addRecipe(<liquid:lava>, <liquid:water>, 200);
+# Use OreDict recipe for impregnated stick
+mods.forestry.Carpenter.removeRecipe(<forestry:oak_stick>);
+mods.forestry.Carpenter.addRecipe(<forestry:oak_stick> * 2, [[<ore:logWood>],[<ore:logWood>]], 40, <liquid:oliveoil> * 100);
+mods.forestry.Carpenter.addRecipe(<forestry:oak_stick> * 2, [[<ore:logWood>],[<ore:logWood>]], 40, <liquid:seed.oil> * 100);
 
-//mods.forestry.Still.removeRecipe(ILiquidStack output, @Optional ILiquidStack fluidInput);
-#mods.forestry.Still.removeRecipe(<liquid:bio.ethanol>);
-#mods.forestry.Still.removeRecipe(<liquid:refinedcanolaoil>,<liquid:canolaoil>);
+# Use OreDict recipe for Impregnated Casing
+val imprCasingGrid = Grid(["AAA","A A","AAA"], {A:<ore:logWood>}).shaped();
+mods.forestry.Carpenter.removeRecipe(<forestry:impregnated_casing>);
+mods.forestry.Carpenter.addRecipe(<forestry:impregnated_casing>, imprCasingGrid, 40, <liquid:oliveoil> * 250);
+mods.forestry.Carpenter.addRecipe(<forestry:impregnated_casing>, imprCasingGrid, 40, <liquid:seed.oil> * 250);
 
 # *======= Thermionic Fabricator =======*
 
