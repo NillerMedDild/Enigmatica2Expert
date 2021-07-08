@@ -800,3 +800,10 @@ function addSaplingsRecipe(sap as IItemStack, group as int[][IIngredient]) {
 }
 
 # ----------------------------
+
+
+# [Fertilized_Essence*2] from [Inferium_Essence][+1]
+craft.shapeless(<mysticalagriculture:fertilized_essence> * 3, "AB", {
+  A: <ore:fertilizer>,     # Fertilizer
+  B: <ore:essenceInferium> # Inferium Essence
+});
