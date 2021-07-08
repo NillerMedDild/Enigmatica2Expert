@@ -200,3 +200,7 @@ for ore_entry in oreDict {
 		scripts.process.compress(inpOre, ore_entry.firstItem, "only: Compactor");
 	}
 }
+
+# Milk Powder <-> Milk conversions
+scripts.process.evaporate(<fluid:milk> * 250, <ic2:dust:33>, "No exceptions");
+scripts.process.solution([<ic2:dust:33>], [<fluid:water> * 250], [<fluid:milk> * 250], null, "Except: highoven");
