@@ -69,15 +69,31 @@ function defaultItem0(items as IItemStack[], default as IItemStack) as IItemStac
   return !isNull(it) ? it : default;
 }
 
+# Get Nth element of float Array. If null or zero - return default
+function defaultChanceN(extraChance as float[], n as int, default as float) as float  {
+  val v = arrN_float(extraChance, n);
+  return v != 0 ? v : default;
+}
+
 # Get 0 element of float Array. If null or zero - return default
 function defaultChance0(extraChance as float[], default as float) as float  {
-  val v = arrN_float(extraChance, 0);
-  return v != 0 ? v : default;
+  return defaultChanceN(extraChance, 0, default);
 }
 
 # Get 0 element of float Array. If null or zero - return default. Return x100 as int
 function defaultChance0_int(extraChance as float[], default as int) as int  {
   return (defaultChance0(extraChance, default as float / 100.0f) * 100.0d) as int;
+}
+
+# Get input/output amount if we have non-whole output amount
+function wholesCalc(inputAmount as int, outputAmount as double) as double[string] {
+  val whole = outputAmount as int as double;
+  val residue = outputAmount - whole;
+  val out1 = outputAmount / inputAmount as double;
+  if(residue == 0) return {"ins": 1.0d, "outs": whole, "out1": out1};
+  val ins = 1.0d / residue;
+  val outs = outputAmount * ins;
+  return {"ins": ins, "outs": outs, "out1": out1};
 }
 
 # ######################################################################
@@ -92,11 +108,22 @@ function warning(machineNameAnyCase as string, inputStr as string, description a
 }
 
 function info(machineNameAnyCase as string, inputStr as string, description as string) as string {
-  print("process.work: [" ~ machineNameAnyCase ~ "] " ~ description ~ "  INPUT: " ~ inputStr);
+  utils.log("process.work: [" ~ machineNameAnyCase ~ "] " ~ description ~ "  INPUT: " ~ inputStr);
   return "";
 }
 
-function avdRockXmlRecipe(namePretty as string, 
+
+# ######################################################################
+#
+# Manual recipes
+#
+# ######################################################################
+
+function xmlRecipe(filename as string, recipeContent as string) {
+  utils.log('Put this recipe in file [' ~ filename ~ '] manually.\n' ~ recipeContent);
+}
+
+function avdRockXmlRecipe(filename as string, 
   inputItems as IIngredient[], inputLiquids as ILiquidStack[],
   outputItems as IItemStack[], outputLiquids as ILiquidStack[]) {
   
@@ -108,9 +135,24 @@ function avdRockXmlRecipe(namePretty as string,
 
   # Inputs
   if(!isNull(inputItems)) { for ii in inputItems { if(ii.items.length > 0) {
-      val in_it = ii.items[0];
-      in_name = (isNull(in_name) ? in_it.displayName : (in_name ~ "+"));
-      s = s ~ '    <itemStack>' ~ in_it.definition.id ~ " " ~ ii.amount ~ " " ~ in_it.damage ~ '</itemStack>\n';
+      var display as string = null;
+      var id as string = null;
+      var meta as int = 0;
+      var type as string = null;
+      val oreRegex = "<ore:(.*)>( \\* \\d+)?";
+      if(ii.commandString.matches(oreRegex)) {
+        type = 'oreDict';
+        id = ii.commandString.replaceAll(oreRegex, "$1");
+        display = id;
+      } else {
+        type = 'itemStack';
+        val in_it = ii.items[0];
+        display = in_it.displayName;
+        id = in_it.definition.id;
+        meta = in_it.damage;
+      }
+      in_name = (isNull(in_name) ? display : (in_name ~ "+"));
+      s = s ~ '    <'+type+'>' ~ id ~" "~ ii.amount ~ ((meta != 0) ? " "~meta : '') ~ '</'+type+'>\n';
   }}}
   if(!isNull(inputLiquids)) { for ii in inputLiquids {
       in_name = (isNull(in_name) ? ii.displayName : (in_name ~ "+"));
@@ -131,9 +173,8 @@ function avdRockXmlRecipe(namePretty as string,
   s = s ~ '    </output></Recipe>';
 
   # Add prefix (reverse order)
-  s = '  <Recipe timeRequired="10" power ="40000"><input>\n' ~ s;
-  s = '  <!-- [' ~ out_name ~ '] from [' ~ in_name ~ '] -->\n' ~ s;
-  s = 'process.work AdvRocketry [' ~ namePretty ~ '] recipe. Add in XML file manually\n' ~ s;
+  s = '  <!-- [' ~ out_name ~ '] from [' ~ in_name ~ '] -->\n' ~
+      '  <Recipe timeRequired="10" power ="40000"><input>\n' ~ s;
 
-  print(s);
+  xmlRecipe("./config/advRocketry/"~filename~".xml", s);
 }
