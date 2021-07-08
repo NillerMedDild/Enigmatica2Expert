@@ -117,6 +117,12 @@ saw(<advancedrocketry:alienwood>    , <advancedrocketry:planks>          , "stri
 saw(<extrautils2:ironwood_log>      , <extrautils2:ironwood_planks>      , "strict: manufactory mekSawmill");
 saw(<extrautils2:ironwood_log:1>    , <extrautils2:ironwood_planks:1>    , "strict: manufactory mekSawmill");
 saw(<randomthings:spectrelog>       , <randomthings:spectreplank>        , "strict: manufactory mekSawmill");
+saw(<iceandfire:dreadwood_log>      , <iceandfire:dreadwood_planks>      , "no exceptions");
+
+# Magical wood special
+saw(<extrautils2:decorativesolidwood:1>,<extrautils2:decorativesolidwood>, "no exceptions");
+scripts.process.sawWood(<extrautils2:decorativesolidwood:1>,<extrautils2:decorativesolidwood>, "only: TESawmill");
+
 
 # Sawdust compat
 // mods.mekanism.sawmill.removeRecipe(<ore:stickWood>);
