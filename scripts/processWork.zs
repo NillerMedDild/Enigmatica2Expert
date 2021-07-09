@@ -5,6 +5,7 @@ import crafttweaker.oredict.IOreDict;
 import crafttweaker.oredict.IOreDictEntry;
 import crafttweaker.liquid.ILiquidStack;
 import crafttweaker.data.IData;
+import mods.mekanism.MekanismHelper.getGas as getGas;
 
 import scripts.processUtils.I;
 import scripts.processUtils.isNotException;
@@ -16,9 +17,12 @@ import scripts.processUtils.arrN_float;
 import scripts.processUtils.defaultItem0;
 import scripts.processUtils.defaultChance0;
 import scripts.processUtils.defaultChance0_int;
+import scripts.processUtils.defaultChanceN;
 import scripts.processUtils.warning;
 import scripts.processUtils.info;
 import scripts.processUtils.avdRockXmlRecipe;
+import scripts.processUtils.xmlRecipe;
+
 
 #priority 51
 
@@ -27,6 +31,8 @@ import scripts.processUtils.avdRockXmlRecipe;
 # All machines works in one function
 #
 # ######################################################################
+
+static recipeCount as int = 0 as int;
 
 # Picks one machine to inject recipe in it
 # Function receive all possible combinations of input and outputs of one machine
@@ -68,6 +74,10 @@ function workEx(machineNameAnyCase as string, exceptions as string,
   val haveLiquidOutput     = !isNull(outputLiquid0);
   val outputLiquidIsSingle = haveLiquidOutput && outputLiquids.length == 1;
 
+  val haveGasOutput        = D(options).check("gasOutput");
+  val outputGasAmount      = D(options).getInt("gasOutputAmount", 600);
+  val outputGas            = haveGasOutput ? getGas(options.gasOutput.asString()) * outputGasAmount : null;
+
   #------------
   # Extra
   #------------
@@ -87,6 +97,23 @@ function workEx(machineNameAnyCase as string, exceptions as string,
   val lenInLiqs  = haveLiquidInput  ? inputLiquids.length  : 0;
   val lenOutItem = haveItemOutput   ? outputItems.length   : 0;
   val lenOutLiqs = haveLiquidOutput ? outputLiquids.length : 0;
+
+  #------------
+  # Combined
+  #------------
+  var combinedOutput as IItemStack[] = null;
+  var combinedChances as float[] = null;
+  if (haveItemOutput) { for i in 0 to outputItems.length {
+      if (isNull(combinedOutput)) { combinedOutput = []; combinedChances = []; }
+      combinedOutput = combinedOutput + outputItems[i];
+      combinedChances = combinedChances + 1.0f;
+  }}
+  if (haveExtra) { for i in 0 to extra.length {
+      if (isNull(combinedOutput)) { combinedOutput = []; combinedChances = []; }
+      combinedOutput = combinedOutput + extra[i];
+      combinedChances = combinedChances + ((!isNull(extraChance) && extraChance.length > i) ? extraChance[i] : 1.0f);
+  }}
+  val havecombinedOutput = !isNull(combinedOutput) && combinedOutput.length > 0;
 
 
   # Machines with one item slot for input and output
@@ -116,8 +143,12 @@ function workEx(machineNameAnyCase as string, exceptions as string,
 
     if (machineName == "grindstone") {
       # mods.astralsorcery.Grindstone.addRecipe(IItemStack input, IItemStack output, float doubleChance);
-      for ii in inputIngr0.itemArray {
-        mods.astralsorcery.Grindstone.addRecipe(ii, outputItem0, defaultChance0(extraChance, 0.0f));
+      if (inputIngr0.amount == 1) {
+        for ii in inputIngr0.itemArray {
+          mods.astralsorcery.Grindstone.addRecipe(ii, outputItem0, defaultChance0(extraChance, 0.0f) / outputItem0.amount);
+        }
+      } else {
+        return info(machineNameAnyCase, getItemName(inputIngr0.itemArray[0]), "received work, but this machine can only work with 1 item as input");
       }
       return machineName;
     }
@@ -150,6 +181,22 @@ function workEx(machineNameAnyCase as string, exceptions as string,
 
     if (machineName == "pressurizer") {
       mods.nuclearcraft.pressurizer.addRecipe(inputIngr0, outputItem0);
+      return machineName;
+    }
+
+    if (machineName == "mekenrichment") {
+      // # mods.mekanism.enrichment.addRecipe(IIngredient inputStack, IItemStack outputStack);
+      mods.mekanism.enrichment.addRecipe(inputIngr0, outputItem0);
+      return machineName;
+    }
+
+    if (machineName == "mekpurification") {
+      mods.mekanism.purification.addRecipe(inputIngr0, outputItem0);
+      return machineName;
+    }
+
+    if (machineName == "mekinjection") {
+      mods.mekanism.chemical_injection.addRecipe(inputIngr0, <gas:hydrogenchloride>, outputItem0);
       return machineName;
     }
 
@@ -201,6 +248,11 @@ function workEx(machineNameAnyCase as string, exceptions as string,
       if (strict) { mods.actuallyadditions.Crusher.removeRecipe(outputItem0); }
       # mods.actuallyadditions.Crusher.addRecipe(IItemStack output, IItemStack input, @Optional IItemStack outputSecondary, @Optional int outputSecondaryChance);
           
+      if (inputIngr0.amount != 1) {
+        return info(machineNameAnyCase, getItemName(inputIngr0.itemArray[0]), 
+        "received work, but this machine can only work with 1 item as input");
+      }
+
       for ii in inputIngr0.itemArray {
         if (haveExtra) {
           mods.actuallyadditions.Crusher.addRecipe(outputItem0, ii, extra[0], defaultChance0_int(extraChance, 100));
@@ -212,9 +264,11 @@ function workEx(machineNameAnyCase as string, exceptions as string,
     }
 
     if (machineName == "aegrinder") {
+      # Grinder.removeRecipe(IItemStack input);
       # Grinder.addRecipe(IItemStack output, IItemStack input, int turns, @Optional IItemStack secondary1Output, @Optional float secondary1Chance, @Optional IItemStack secondary2Output, @Optional float secondary2Chance);
 
       for ii in inputIngr0.itemArray {
+        if (strict) { mods.appliedenergistics2.Grinder.removeRecipe(ii); }
         if (haveExtra) {
           if (extra.length == 1) {
             mods.appliedenergistics2.Grinder.addRecipe(outputItem0, ii, 2, extra[0], extraChance[0]);
@@ -227,21 +281,26 @@ function workEx(machineNameAnyCase as string, exceptions as string,
       }
       return machineName;
     }
+
+    if (machineName == "metalpress") {
+      # mods.immersiveengineering.MetalPress.addRecipe(IItemStack output, IIngredient input, IItemStack mold, int energy, @Optional int inputSize);
+
+      val molds as IItemStack[string] = {
+        plate: <immersiveengineering:mold:0>,
+        gear:  <immersiveengineering:mold:1>,
+        rod:   <immersiveengineering:mold:2>,
+        unpack:<immersiveengineering:mold:7>,
+      } as IItemStack[string];
+
+      val mold = !isNull(options.mold) ? molds[options.mold.asString()] : null;
+      mods.immersiveengineering.MetalPress.addRecipe(outputItem0, inputIngr0, !isNull(mold) ? mold : molds.plate, 2000, inputIngr0.amount);
+      return machineName;
+    }
   } 
 
   # Machines with ONE item INPUT
   # 📦 → [📦+]
   if (item_to_item && inputIsSingle) {
-  
-    if (machineName == "rockcrusher") {
-      # mods.nuclearcraft.rock_crusher.addRecipe([itemInput, itemOutput1, itemOutput2, itemOutput3, @Optional double timeMultiplier, @Optional double powerMultiplier, @Optional double processRadiation]);
-      mods.nuclearcraft.rock_crusher.addRecipe([inputIngr0, 
-        arrN_item(outputItems, 0), defaultChance0_int(extraChance, 80),
-        arrN_item(outputItems, 1), defaultChance0_int(extraChance, 30),
-        arrN_item(outputItems, 2), defaultChance0_int(extraChance, 10),
-        2.0d, 1.5d]);
-      return machineName;
-    }
   
     if (machineName == "thermalcentrifuge") {
       # mods.ic2.ThermalCentrifuge.addRecipe([IItemStack[] outputs, IIngredient input, @Optional int minHeat);
@@ -253,7 +312,17 @@ function workEx(machineNameAnyCase as string, exceptions as string,
   # Machines with ONE item INPUT and unknown output
   # 📦 → ?
   if (inputIsSingle) {
-    
+  
+    if (machineName == "rockcrusher") {
+      # mods.nuclearcraft.rock_crusher.addRecipe([itemInput, itemOutput1, itemOutput2, itemOutput3, @Optional double timeMultiplier, @Optional double powerMultiplier, @Optional double processRadiation]);
+      mods.nuclearcraft.rock_crusher.addRecipe([inputIngr0, 
+        arrN_item(combinedOutput, 0), (combinedChances[0] * 100) as int,
+        arrN_item(combinedOutput, 1), (combinedChances[1] * 100) as int,
+        arrN_item(combinedOutput, 2), (combinedChances[2] * 100) as int,
+        2.0d, 1.5d]);
+      return machineName;
+    }
+
     if (machineName == "squeezer") {
       # Squeezer.addRecipe(IItemStack inputStack, 
       #   @Optional IItemStack outputStack1, @Optional float outputStackChance1,
@@ -288,42 +357,44 @@ function workEx(machineNameAnyCase as string, exceptions as string,
 
     if (machineName == "tecentrifuge") {
       #mods.thermalexpansion.Centrifuge.addRecipe(WeightedItemStack[] outputs, IItemStack input, ILiquidStack fluid, int energy);
-      var combinedOutput = [] as WeightedItemStack[];
-      if (haveItemOutput) {
-        for i in 0 to outputItems.length {
-          combinedOutput = combinedOutput + outputItems[i] % 100;
-        }
-      }
-      if (haveExtra) {
-        for i in 0 to extra.length {
-          combinedOutput = combinedOutput + extra[i] % ((extraChance[i] * 100) as int);
-        }
-      }
-      if (combinedOutput.length > 0) {
-        for ii in inputIngr0.itemArray {
-          mods.thermalexpansion.Centrifuge.addRecipe(combinedOutput, ii, outputLiquid0, 2000);
-        }
-      } else {
+      if (!havecombinedOutput) 
         return info(machineNameAnyCase, getItemName(inputIngr0.itemArray[0]), "received work, but this machine MUST have item output");
+        
+      # Calculate chanced output from combined
+      var chancedCombined = [] as WeightedItemStack[];
+      for i, out in combinedOutput {
+        chancedCombined = chancedCombined + out % ((combinedChances[i] * 100) as int);
+      }
+
+      for ii in inputIngr0.itemArray {
+        mods.thermalexpansion.Centrifuge.addRecipe(chancedCombined, ii, outputLiquid0, 2000);
+      }
+      return machineName;
+    }
+
+    if (machineName == "centrifuge") {
+      //mods.forestry.Centrifuge.addRecipe(WeightedItemStack[] output, IItemStack ingredients, int packagingTime);
+      if (!havecombinedOutput) 
+        return info(machineNameAnyCase, getItemName(inputIngr0.itemArray[0]), "received work, but this machine MUST have item output");
+        
+      # Calculate chanced output from combined
+      var chancedCombined = [] as WeightedItemStack[];
+      for i, out in combinedOutput {
+        chancedCombined = chancedCombined + out % ((combinedChances[i] * 100) as int);
+      }
+
+      for ii in inputIngr0.itemArray {
+        mods.forestry.Centrifuge.addRecipe(chancedCombined, ii, 200);
       }
       return machineName;
     }
 
     if (machineName == "sagmill") {
-      var combinedOutput = [] as IItemStack[];
-      var combinedChances = [] as float[];
-      if (haveItemOutput) {
-        for i in 0 to outputItems.length {
-          combinedOutput = combinedOutput + outputItems[i];
-          combinedChances = combinedChances + 1.0f;
-        }
+      if (inputIngr0.amount != 1) {
+        return info(machineNameAnyCase, getItemName(inputIngr0.itemArray[0]), 
+        "received work, but this machine can only work with 1 item as input");
       }
-      if (haveExtra) {
-        for i in 0 to extra.length {
-          combinedOutput = combinedOutput + extra[i];
-          combinedChances = combinedChances + (extraChance.length > i ? extraChance[i] : 1.0f);
-        }
-      }
+      
       if (combinedOutput.length > 0 && combinedChances.length >= combinedOutput.length) {
         mods.enderio.SagMill.addRecipe(combinedOutput, combinedChances, inputIngr0);
       } else {
@@ -333,12 +404,25 @@ function workEx(machineNameAnyCase as string, exceptions as string,
     }
 
     if (machineName == "iecrusher") {
+      # mods.immersiveengineering.Crusher.removeRecipe(IItemstack output);
+      if (strict) { mods.immersiveengineering.Crusher.removeRecipe(outputItem0); }
       # mods.immersiveengineering.Crusher.addRecipe(IItemStack output, IIngredient input, int energy, @Optional IItemStack secondaryOutput, @Optional double secondaryChance);
       if (haveExtra) {
         mods.immersiveengineering.Crusher.addRecipe(outputItem0, inputIngr0, 2048, extra[0], extraChance[0]);
       } else {
         mods.immersiveengineering.Crusher.addRecipe(outputItem0, inputIngr0, 2048);
       }
+      return machineName;
+    }
+
+    if (machineName == "infernalfurnace") {
+      if (!haveExtra) {
+        return info(machineNameAnyCase, getItemName(inputIngr0.itemArray[0]), 
+        "received work, but this machine need extra output");
+      }
+      //mods.thaumcraft.SmeltingBonus.addSmeltingBonus(IIngredient input, WeightedItemStack stack)
+      mods.thaumcraft.SmeltingBonus.addSmeltingBonus(inputIngr0, extra0 % defaultChance0_int(extraChance, 20));
+      
       return machineName;
     }
 
@@ -377,9 +461,19 @@ function workEx(machineNameAnyCase as string, exceptions as string,
     }
 
     if (machineName == "alloysmelter") {
-      # mods.enderio.AlloySmelter.addRecipe(IItemStack output, IIngredient[] input, @Optional int energyCost, @Optional float xp);
       if (strict) { mods.enderio.AlloySmelter.removeRecipe(outputItem0); }
       mods.enderio.AlloySmelter.addRecipe(outputItem0, inputItems, 2000);
+      return machineName;
+    }
+
+    if (machineName == "kiln") {
+      if (strict) { mods.immersiveengineering.AlloySmelter.removeRecipe(outputItem0); }
+      if (inputItems.length == 2) {
+        mods.immersiveengineering.AlloySmelter.addRecipe(outputItem0, inputItems[0], inputItems[1], 400);
+      } else {
+        return info(machineNameAnyCase, getItemName(inputIngr0.itemArray[0]), "received work, but number of inputs != 2");
+      }
+
       return machineName;
     }
 
@@ -442,15 +536,34 @@ function workEx(machineNameAnyCase as string, exceptions as string,
 
     if (machineName == "advrockarc") {
       # Log recipes to manual add in XML file
-      avdRockXmlRecipe("Electric Furnace", inputItems, null, outputItems, null);
+      avdRockXmlRecipe("ElectricArcFurnace", inputItems, null, outputItems, null);
       return machineName;
     }
 
     if (machineName == "advrockcutter") {
       # Log recipes to manual add in XML file
-      avdRockXmlRecipe("Block Cutter", inputItems, null, outputItems, null);
+      avdRockXmlRecipe("CuttingMachine", inputItems, null, outputItems, null);
       return machineName;
     }
+
+    if (machineName == "starlightinfuser") {
+      # mods.astralsorcery.StarlightInfusion.addInfusion(IItemStack input, IItemStack output, boolean consumeMultiple, float consumptionChance, int craftingTickTime);
+      
+      if (inputIngr0.amount != 1) {
+        return info(machineNameAnyCase, getItemName(inputIngr0.itemArray[0]), 
+        "received work, but this machine can only work with 1 item as input");
+      }
+
+      if (inputItems.length == 1 && outputItems.length == 1) {
+        for ii in inputIngr0.itemArray {
+          mods.astralsorcery.StarlightInfusion.addInfusion(ii, outputItem0, false, 0.7, 60);
+        }
+      } else {
+        return info(machineNameAnyCase, getItemName(inputIngr0.itemArray[0]), "received work, but number of inputs or outputs != 1");
+      }
+      return machineName;
+    }
+
   }
 
   # ONE item to one liquid
@@ -471,11 +584,10 @@ function workEx(machineNameAnyCase as string, exceptions as string,
       return machineName;
     }
 
-    if (machineName == "forestrysqueezer") {
-      #mods.forestry.Squeezer.addRecipe(ILiquidStack fluidOutput, IItemStack[] ingredients, int timePerItem, @Optional WeightedItemStack itemOutput);
+    if (machineName == "crucible") {
+      # mods.thermalexpansion.Crucible.addRecipe(ILiquidStack output, IItemStack input, int energy);
       for ii in inputIngr0.itemArray {
-        val wOut as WeightedItemStack = !isNull(outputItem0) ? outputItem0 % defaultChance0_int(extraChance, 20) : null;
-        mods.forestry.Squeezer.addRecipe(outputLiquid0, [ii], 20, wOut);
+        mods.thermalexpansion.Crucible.addRecipe(outputLiquid0, ii, 2800);
       }
       return machineName;
     }
@@ -520,6 +632,14 @@ function workEx(machineNameAnyCase as string, exceptions as string,
 
     if (machineName == "ncinfuser") { 
       mods.nuclearcraft.infuser.addRecipe(inputIngr0, inputLiquid0, outputItem0);
+      return machineName;
+    }
+
+    if (machineName == "transposer") { 
+      //mods.thermalexpansion.Transposer.addFillRecipe(IItemStack output, IItemStack input, ILiquidStack fluid, int energy);
+      for ii in inputIngr0.itemArray {
+        mods.thermalexpansion.Transposer.addFillRecipe(outputItem0, ii, inputLiquid0, 2000);
+      }
       return machineName;
     }
 
@@ -568,7 +688,12 @@ function workEx(machineNameAnyCase as string, exceptions as string,
 
     if (machineName == "advrockelectrolyzer") {
       # Log recipes to manual add in XML file
-      avdRockXmlRecipe("Electrolyzer", null, inputLiquids, null, outputLiquids);
+      var newOutputLiquids = outputLiquids;
+      if(outputLiquids.length > 2) {
+        newOutputLiquids = [] as ILiquidStack[];
+        for i in 0 .. 2 { newOutputLiquids += outputLiquids[i]; }
+      }
+      avdRockXmlRecipe("Electrolyser", null, inputLiquids, null, newOutputLiquids);
       return machineName;
     }
   }
@@ -579,24 +704,35 @@ function workEx(machineNameAnyCase as string, exceptions as string,
 
     if (machineName == "vat") {
       if (inputItems.length <= 2) {
-      var s = 'process.work EiO Vat recipe. Add in XML file manually\n';
-      s = s ~ "<recipe name=\"" ~ outputLiquid0.displayName ~ "\" required=\"true\"><fermenting energy=\"10000\">\n";
-      for inIngr in inputItems {
-        s = s ~ "  <inputgroup>\n";
-        for ii in inIngr.itemArray {
-          s = s ~ "    <input name=\"" ~ ii.commandString.replaceAll("[<>]", "") ~ "\" multiplier=\"1.0\" />\n";
+        var s = '<recipe name="' ~ outputLiquid0.displayName ~ '" required="true"><fermenting energy="10000">\n';
+        val in_f = (inputLiquid0.amount as float) / 1000;
+        val out_f = (outputLiquid0.amount as float) / 1000;
+        for inIngr in inputItems {
+          s = s ~ '  <inputgroup>\n';
+          for ii in inIngr.itemArray {
+            s = s ~ '    <input name="' ~ ii.commandString.replaceAll("[<>]", "") ~ '" multiplier="' ~ in_f / inputItems.length ~ '" />\n';
+          }
+          s = s ~ '  </inputgroup>\n';
         }
-        s = s ~ "  </inputgroup>\n";
-      }
-      s = s ~ "    <inputfluid name=\"" ~ inputLiquid0.name ~ "\" multiplier=\"" ~ (outputLiquid0.amount as float) / 1000 ~ "\" />\n";
-      s = s ~ "    <outputfluid name=\"" ~ outputLiquid0.name ~ "\" /></fermenting></recipe>";
-      print(s);
-      # mods.enderio.Vat.addRecipe(ILiquidStack output, ILiquidStack input, IIngredient[] slot1Solids, float[] slot1Mults, IIngredient[] slot2Solids, float[] slot2Mults, @Optional int energyCost);
-      # mods.enderio.Vat.addRecipe(outputLiquid0, inputLiquid0, [arrN_item(inputItems, 0)], [1.0f], [arrN_item(inputItems, 1)], [1.0f], 5000);
-      return machineName;
+        s = s ~ '    <inputfluid name="' ~ inputLiquid0.name ~ '" multiplier="' ~ in_f / out_f ~ '" />\n';
+        s = s ~ '    <outputfluid name="' ~ outputLiquid0.name ~ '" /></fermenting></recipe>';
+
+        xmlRecipe("./config/enderio/recipes/user/user_recipes.xml", s);
+        # mods.enderio.Vat.addRecipe(ILiquidStack output, ILiquidStack input, IIngredient[] slot1Solids, float[] slot1Mults, IIngredient[] slot2Solids, float[] slot2Mults, @Optional int energyCost);
+        # mods.enderio.Vat.addRecipe(outputLiquid0, inputLiquid0, [arrN_item(inputItems, 0)], [1.0f], [arrN_item(inputItems, 1)], [1.0f], 5000);
+        return machineName;
       } else {
         return info(machineNameAnyCase, inputLiquid0.name, "received work, but amount of inputs > 2");
       }
+    }
+
+    if (machineName == "mixer") {
+      if (inputItems.length > 6) return info(machineNameAnyCase, inputLiquid0.name, "received work, but amount of inputs > 6");
+
+      # mods.immersiveengineering.Mixer.addRecipe(ILiquidStack output, ILiquidStack fluidInput, IIngredient[] itemInputs, int energy);
+      mods.immersiveengineering.Mixer.addRecipe(outputLiquid0, inputLiquid0, inputItems, 2048);
+
+      return machineName;
     }
   }
 
@@ -635,13 +771,34 @@ function workEx(machineNameAnyCase as string, exceptions as string,
 
     if (machineName == "chemicalreactor") {
       if (lenInItem <= 4 && lenInLiqs <= 2 && lenOutItem <= 4 & lenOutLiqs <= 1) {
-        avdRockXmlRecipe("Chemical Reactor", inputItems, inputLiquids, outputItems, outputLiquids);
+        avdRockXmlRecipe("ChemicalReactor", inputItems, inputLiquids, outputItems, outputLiquids);
         return machineName;
       } else {
         return info(machineNameAnyCase, inputLiquid0.name, "received work, but input and output amounts can't fit in machine");
       }
     }
+
+    if (machineName == "forestrysqueezer") {
+      #mods.forestry.Squeezer.addRecipe(ILiquidStack fluidOutput, IItemStack[] ingredients, int timePerItem, @Optional WeightedItemStack itemOutput);
+      var inputItemStacks = [] as IItemStack[];
+      for inIngr in inputItems {
+        inputItemStacks = inputItemStacks + inIngr.itemArray[0];
+      }
+      val wOut as WeightedItemStack = !isNull(outputItem0) ? outputItem0 % defaultChance0_int(extraChance, 20) : null;
+      mods.forestry.Squeezer.addRecipe(outputLiquid0, inputItemStacks, 20, wOut);
+      return machineName;
+    }
   }
+
+  # ONE item to one gas
+  # 📦 → 🟡
+  if (inputIsSingle && haveGasOutput) {
+    if (machineName == "mekdissolution") {
+      mods.mekanism.chemical_dissolution.addRecipe(inputIngr0, outputGas);
+      return machineName;
+    }
+  }
+
 
   return warning(machineNameAnyCase,
     !isNull(inputIngr0)   ? getItemName(inputIngr0.itemArray[0]) : (

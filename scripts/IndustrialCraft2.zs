@@ -187,38 +187,34 @@ import mods.ic2.ScrapBox;
 # Energy crystal compat
 scripts.process.compress(<ic2:dust:6> * 9, <ic2:energy_crystal:27>, "except: compressor");
 
-# New Scraps
-ScrapBox.addDrop(<appliedenergistics2:material:6>, 4.0F);         			# Matter Ball
-ScrapBox.addDrop(<immersiveengineering:material:5>, 0.6F);        			# Tough Fabric
-ScrapBox.addDrop(<industrialforegoing:plastic>, 1.1F);            			# Plastic
-ScrapBox.addDrop(<thermalfoundation:material:864>, 2.8F);         			# Slag
-ScrapBox.addDrop(<actuallyadditions:item_crystal_shard:1>, 0.1F); 			# Crystal Shard
-ScrapBox.addDrop(<actuallyadditions:item_crystal_shard:2>, 0.1F); 			# Crystal Shard
-ScrapBox.addDrop(<actuallyadditions:item_crystal_shard:3>, 0.1F); 			# Crystal Shard
-ScrapBox.addDrop(<actuallyadditions:item_crystal_shard:4>, 0.1F); 			# Crystal Shard
-ScrapBox.addDrop(<actuallyadditions:item_crystal_shard:5>, 0.1F); 			# Crystal Shard
-ScrapBox.addDrop(<actuallyadditions:item_crystal_shard>, 0.1F);   			# Crystal Shard
-ScrapBox.addDrop(<appliedenergistics2:fluix_block>, 0.2F);        			# Fluix Block
-ScrapBox.addDrop(<appliedenergistics2:material:52>, 0.6F);        			# Blank Pattern
-ScrapBox.addDrop(<extrautils2:decorativesolid:3>, 0.4F);          			# Stoneburnt
-ScrapBox.addDrop(<extrautils2:decorativesolid:7>, 0.4F);          			# Quartzburnt
-ScrapBox.addDrop(<extrautils2:klein>, 0.1F);                      			# Klein Bottle
-ScrapBox.addDrop(<forestry:chipsets:1>.withTag({T: 1 as short}), 0.06F);    # Circuit
-ScrapBox.addDrop(<forestry:chipsets:2>.withTag({T: 2 as short}), 0.04F);    # Circuit
-ScrapBox.addDrop(<forestry:chipsets:3>.withTag({T: 3 as short}), 0.01F);    # Circuit
-ScrapBox.addDrop(<forestry:chipsets>.withTag({}), 0.1F);          			# Circuit
-ScrapBox.addDrop(<immersiveengineering:material:26>, 0.1F);       			# Vacuum Tube
-ScrapBox.addDrop(<immersiveengineering:stone_decoration:8>, 0.4F);			# Insulating Glass
-ScrapBox.addDrop(<industrialforegoing:pink_slime>, 0.3F);         			# Pink Slime
-ScrapBox.addDrop(<mekanism:mufflingupgrade>, 1.5F);               			# Muffling Upgrade
-ScrapBox.addDrop(<mekanism:polyethene:2>, 0.9F);                  			# HDPE Sheet
-ScrapBox.addDrop(<mekanism:substrate>, 2.4F);                     			# Substrate
-ScrapBox.addDrop(<mekanismgenerators:hohlraum>, 2.1F);            			# Hohlraum
-ScrapBox.addDrop(<nuclearcraft:upgrade:1>, 0.9F);                 			# Energy Upgrade
-ScrapBox.addDrop(<nuclearcraft:upgrade>, 0.9F);                   			# Speed Upgrade
-ScrapBox.addDrop(<psi:cad_colorizer_:17>, 0.1F);                  			# Psi CAD Colorizer
-ScrapBox.addDrop(<rftools:shape_card>, 0.3F);                     			# Shape Card
-ScrapBox.addDrop(<rftools:syringe>, 1.7F);                        			# Syringe
-ScrapBox.addDrop(<rftoolsdim:dimlet_parcel>, 0.03F);              			# Dimlet Parcel
-ScrapBox.addDrop(<thermalexpansion:frame:64>, 0.05F);             			# Device Frame
-ScrapBox.addDrop(<thermalfoundation:diagram_redprint>, 3.1F);     			# Redprint
+
+# Dense plates in Thermal Expansion Compactor
+for ore_entry in oreDict {
+	val name = ore_entry.name;
+	if (name.matches("plateDense[A-Z]\\w+")) {
+    val ore_name = name.substring(10);
+		val inpOre = (ore_name == "Obsidian")
+			? (<minecraft:obsidian> * 4) as IIngredient
+			: oreDict["block"~ore_name];
+		if(inpOre.items.length <= 0) continue;
+		scripts.process.compress(inpOre, ore_entry.firstItem, "only: Compactor");
+	}
+}
+
+# Milk Powder <-> Milk conversions
+scripts.process.evaporate(<fluid:milk> * 250, <ic2:dust:33>, "No exceptions");
+scripts.process.solution([<ic2:dust:33>], [<fluid:water> * 250], [<fluid:milk> * 250], null, "Except: highoven");
+
+# This recipe was corrupted. Error:
+#   Could not dump recipe for <ic2:te:2>
+#   java.lang.IndexOutOfBoundsException: Index: 0, Size: 0
+# Somehow it have "null" instead of each ingredient
+# [Nuke] from [Advanced Machine Casing][+2]
+craft.remake(<ic2:te:2>, ["pretty",
+  "I A I",
+  "I ■ I",
+  "I A I"], {
+  "■": <ore:machineBlockAdvanced>, # Advanced Machine Casing
+  "A": <ore:circuitAdvanced>,      # Advanced Circuit
+  "I": <ic2:iridium_reflector>,    # Iridium Neutron Reflector
+});
